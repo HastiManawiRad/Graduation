@@ -140,13 +140,13 @@ def custom_model(num_classes):
 def loadData():
 
     #create dataset & split
-    dataset = ColumnsDataset(r"C:\Users\HMd5\OneDrive - BVGO\School\Master\Afstuderen\OD\images", img_transforms)
+    dataset = ColumnsDataset(r"C:\Users\HMd5\OneDrive - BVGO\School\Master\Afstuderen\OD\AUG_images", img_transforms)
     #dataset_test = ColumnsDataset(r"C:\Users\HMd5\OneDrive - BVGO\School\Master\Afstuderen\OD\AUG_images", img_transforms)
     #indices = torch.randperm(len(dataset)).tolist()
 
     train_ratio = 0.7
-    val_ratio = 0.15
-    test_ratio = 0.15
+    val_ratio = 0.2
+    test_ratio = 0.1
 
     dataset_len = len(dataset)
     train_len = int(dataset_len*train_ratio)
@@ -193,9 +193,9 @@ def train(train_subset, test_subset, val_subset, img_transforms):
     print(output)
 
     #inference:
-    model.eval()
-    x = [torch.rand(3, 224, 224), torch.rand(3, 224, 224)]
-    predictions = model(x)
+    #model.eval()
+    #x = [torch.rand(3, 224, 224), torch.rand(3, 224, 224)]
+    #predictions = model(x)
 
     #Define optimizer & epochs
     device = torch.device('cuda') if torch.cuda.is_available() else torch.device('cpu')
@@ -251,6 +251,8 @@ def train(train_subset, test_subset, val_subset, img_transforms):
         epoch_loss = 0
         start_time = time.time()
         for i, (images, targets) in enumerate(train_loader):
+            
+            batch_start_time = time.time()
 
             images = list(image.to(device) for image in images)
             targets = [{k: v.to(device) for k, v in target.items()} for target in targets]
@@ -260,19 +262,28 @@ def train(train_subset, test_subset, val_subset, img_transforms):
             loss_value = losses.item()
             epoch_loss += loss_value
 
-            batch_time = time.time()
-            speed = (i+1)/(batch_time-start_time)
-            print("[%5d] loss: %.3f, speed: %.2f" %
-                (i, loss_value, speed))
+            #batch_time = time.time()
+            #speed = (i+1)/(batch_time-start_time)
+            #print("[%5d] loss: %.3f, speed: %.2f" %
+                #(i, loss_value, speed))
             
-            if not math.isfinite(loss_value):
-                print(f"Loss is { loss_value}, stopping training")
-                print(loss_dict)
-                break
+            #if not math.isfinite(loss_value):
+                #print(f"Loss is { loss_value}, stopping training")
+                #print(loss_dict)
+                #break
 
             optimizer.zero_grad()
             losses.backward()
             optimizer.step()
+
+            batch_time = time.time() - batch_start_time
+            speed = 1/batch_time
+            print(f"[Batch {i+1}] Loss: {loss_value:.3f}, Speed: {speed:.2f} batches/sec")
+
+            if not math.isfinite(loss_value):
+                print(f"Loss is { loss_value}, stopping training")
+                print(loss_dict)
+                break
 
         avg_loss = epoch_loss / len(train_loader)
         return avg_loss
@@ -280,7 +291,7 @@ def train(train_subset, test_subset, val_subset, img_transforms):
     early_stopping = EarlyStopping(patience=5, min_delta=0.0001)
 
     #train model for n epochs
-    num_epochs = 15
+    num_epochs = 30
     epoch_losses = [] 
     validation_losses = []
     best_loss = float('inf')
@@ -330,10 +341,11 @@ def train(train_subset, test_subset, val_subset, img_transforms):
             "optimizer_state_dict": optimizer.state_dict(),
             "avg_loss": avg_loss
         }
-        torch.save(checkpoint, "best-model-parameters.1009.test.pt")
+        torch.save(checkpoint, "best-model-parameters.1109.testcase1.pt")
     #torch.save(model.state_dict(), 'best-model-parameters.pt')
 
     return model
+
 
 def test(model):
     #load model with best parameters
@@ -342,12 +354,12 @@ def test(model):
     device = torch.device('cuda') if torch.cuda.is_available() else torch.device('cpu')
     num_classes = 2
     model = custom_model(num_classes)
-    checkpoint = torch.load("best-model-parameters.1009.test.pt")
+    checkpoint = torch.load("best-model-parameters.1109.testcase1.pt")
     model.load_state_dict(checkpoint["model_state_dict"])
     model.to(device)
     model.eval()
     
-    test_image_path = r"C:\Users\HMd5\OneDrive - BVGO\School\Master\Afstuderen\OD\AUG_images\image00385_aug_3.jpeg"
+    test_image_path = r"C:\Users\HMd5\OneDrive - BVGO\School\Master\Afstuderen\OD\AUG_images_test\image00405_aug_5.jpeg"
     test_image = Image.open(test_image_path)
 
     img_transforms = transforms.Compose([
@@ -369,17 +381,34 @@ def test(model):
         predictions = model([test_image])
         pred = predictions[0]
 
+    confidence_treshold = 0.9
+    keep = pred["scores"] > confidence_treshold
+
+    if keep.sum().item() == 0:
+        print("No detections")
+        return
+    
+    pred_boxes = pred["boxes"][keep].cpu()
+    pred_labels = pred["labels"][keep].cpu()
+    pred_scores = pred["scores"][keep].cpu()
+
+    formatted_labels = [f"column {i+1}: {score:.3f}" for i, score in enumerate(pred_scores)]
+
+    print("Bbox coordinates:")
+    for i, (box, label) in enumerate(zip(pred_boxes, formatted_labels)):
+        x_min, y_min, x_max, y_max = box
+        print(f"{label} (x_min: {x_min:.2f}, y_min: {y_min:.2f}, x_max: {x_max:.2f}, y_max: {y_max:.2f})")
+
     test_image = test_image.cpu()
     test_image = (255.0 * (test_image - test_image.min()) / (test_image.max() - test_image.min())).to(torch.uint8)
     test_image = test_image[:3, ...]
-    pred_labels = [f"columns: {score:.3f}" for label, score in zip(pred["labels"], pred["scores"])]
-    pred_boxes = pred["boxes"].long()
-    output_image = draw_bounding_boxes(test_image, pred_boxes, pred_labels, colors="red", width=3)
+    
+    #formatted_labels = [f"column {label.item()}: {score:.3f}" for label, score in zip(pred_labels, pred_scores)]
+    #pred_labels = [f"columns: {score:.3f}" for label, score in zip(pred["labels"], pred["scores"])]
+    #pred_boxes = pred["boxes"].long()
+    
+    output_image = draw_bounding_boxes(test_image, pred_boxes, labels=formatted_labels, colors="red", width=3)
 
-    confidence_treshold = 0.9
-    pred_boxes = pred["boxes"][pred["scores"] > confidence_treshold].cpu()
-    score = pred["scores"][pred["scores"] > confidence_treshold].cpu()
-    pred_labels = pred["labels"][pred["scores"] > confidence_treshold].cpu()
 
     plt.figure(figsize=(12, 12))
     plt.imshow(output_image.permute(1, 2, 0))
