@@ -3,8 +3,8 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 #print images
-color_raw = o3d.io.read_image("D:\hasti\Object_detection/rgb1.png")
-depth_raw = o3d.io.read_image("D:\hasti\Object_detection\depth1.png")
+color_raw = o3d.io.read_image("PATH TO YOUR RGB IMAGE")
+depth_raw = o3d.io.read_image("PATH TO YOUR DEPTH IMAGE")
 rgbd_image = o3d.geometry.RGBDImage.create_from_color_and_depth(
     color_raw, depth_raw)
 print(rgbd_image)
