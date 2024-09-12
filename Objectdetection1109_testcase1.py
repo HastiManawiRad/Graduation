@@ -24,13 +24,9 @@ import xml.etree.cElementTree as ET
 import time
 import glob
 from PIL import Image
-#import engine
-#import tqdm
-#from engine import train_one_epoch, evaluate
 
 def read_image(image_path):
     return Image.open(image_path)
-
 
 
 class ColumnsDataset(torch.utils.data.Dataset):
@@ -140,8 +136,7 @@ def custom_model(num_classes):
 def loadData():
 
     #create dataset & split
-    dataset = ColumnsDataset(r"C:\Users\HMd5\OneDrive - BVGO\School\Master\Afstuderen\OD\AUG_images", img_transforms)
-    #dataset_test = ColumnsDataset(r"C:\Users\HMd5\OneDrive - BVGO\School\Master\Afstuderen\OD\AUG_images", img_transforms)
+    dataset = ColumnsDataset(r"PATH TO DATASET", img_transforms)
     #indices = torch.randperm(len(dataset)).tolist()
 
     train_ratio = 0.7
@@ -163,7 +158,6 @@ def loadData():
 
 def train(train_subset, test_subset, val_subset, img_transforms):
     BATCH_SIZE = 8
-    #train_dataset = ColumnsDataset()
     train_loader = DataLoader(train_subset, batch_size=BATCH_SIZE, pin_memory=False, shuffle=True, collate_fn=collate_fn)
     test_loader = DataLoader(test_subset, batch_size=BATCH_SIZE, pin_memory=False, shuffle=True, collate_fn=collate_fn)
     val_loader = DataLoader(val_subset, batch_size=BATCH_SIZE, pin_memory=False, shuffle=True, collate_fn=collate_fn)
@@ -192,18 +186,12 @@ def train(train_subset, test_subset, val_subset, img_transforms):
     print(type(output))
     print(output)
 
-    #inference:
-    #model.eval()
-    #x = [torch.rand(3, 224, 224), torch.rand(3, 224, 224)]
-    #predictions = model(x)
-
     #Define optimizer & epochs
     device = torch.device('cuda') if torch.cuda.is_available() else torch.device('cpu')
     print('Using device:', device)
     print()
     num_classes = 2
     model = custom_model(num_classes)
-    #lr terug naar 0.001 zetten?
     optimizer = torch.optim.AdamW(model.parameters(), lr= 0.0001, weight_decay= 0.0005)
     lr_scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode="min", factor=0.1, patience=2)
     model.to(device)
@@ -234,7 +222,6 @@ def train(train_subset, test_subset, val_subset, img_transforms):
                 print(f"Content loss_dict: {loss_dict}")
 
                 if isinstance(loss_dict, dict):
-                # Sum all the loss values in the dictionary
                     losses = sum(loss for loss in loss_dict.values() if isinstance(loss, torch.Tensor))
                 else:
                     raise ValueError("Unexpected type for model output, expected dict")
@@ -261,16 +248,6 @@ def train(train_subset, test_subset, val_subset, img_transforms):
             losses = sum(loss for loss in loss_dict.values())
             loss_value = losses.item()
             epoch_loss += loss_value
-
-            #batch_time = time.time()
-            #speed = (i+1)/(batch_time-start_time)
-            #print("[%5d] loss: %.3f, speed: %.2f" %
-                #(i, loss_value, speed))
-            
-            #if not math.isfinite(loss_value):
-                #print(f"Loss is { loss_value}, stopping training")
-                #print(loss_dict)
-                #break
 
             optimizer.zero_grad()
             losses.backward()
@@ -323,7 +300,6 @@ def train(train_subset, test_subset, val_subset, img_transforms):
     plt.plot(range(1, epochs_completed + 1), epoch_losses, label="Training loss")
     plt.plot(range(1, epochs_completed + 1), validation_losses, label="Validation loss", linestyle='--')
 
-    # Update x-ticks based on the completed epochs
     plt.xticks(range(1, epochs_completed + 1))
 
     plt.xlabel("Epoch")
@@ -348,8 +324,8 @@ def train(train_subset, test_subset, val_subset, img_transforms):
 
 
 def test(model):
-    #load model with best parameters
     #testing loop
+    #load model with best parameters
     print("Start testing process")
     device = torch.device('cuda') if torch.cuda.is_available() else torch.device('cpu')
     num_classes = 2
@@ -359,7 +335,7 @@ def test(model):
     model.to(device)
     model.eval()
     
-    test_image_path = r"C:\Users\HMd5\OneDrive - BVGO\School\Master\Afstuderen\OD\AUG_images_test\image00405_aug_5.jpeg"
+    test_image_path = r"PATH TO IMAGE"
     test_image = Image.open(test_image_path)
 
     img_transforms = transforms.Compose([
@@ -371,7 +347,7 @@ def test(model):
     test_image = img_transforms(test_image)
     test_image = test_image[:3, ...].to(device)
     
-    #test_image = read_image(test_image_path)  # This reads the image as a tensor
+    #test_image = read_image(test_image_path)
     #test_image = convert_image_dtype(test_image, torch.float32)
     #print(f"Image loaded. Type: {type(test_image)}, Shape: {test_image.shape}")
 
@@ -403,10 +379,6 @@ def test(model):
     test_image = (255.0 * (test_image - test_image.min()) / (test_image.max() - test_image.min())).to(torch.uint8)
     test_image = test_image[:3, ...]
     
-    #formatted_labels = [f"column {label.item()}: {score:.3f}" for label, score in zip(pred_labels, pred_scores)]
-    #pred_labels = [f"columns: {score:.3f}" for label, score in zip(pred["labels"], pred["scores"])]
-    #pred_boxes = pred["boxes"].long()
-    
     output_image = draw_bounding_boxes(test_image, pred_boxes, labels=formatted_labels, colors="red", width=3)
 
 
@@ -414,10 +386,10 @@ def test(model):
     plt.imshow(output_image.permute(1, 2, 0))
     plt.show()
 
-
+#Hash out train or test if you do not want to execute them
 model = custom_model
 train_subset, test_subset, val_subset = loadData()
-#train(train_subset, test_subset, val_subset, img_transforms)
+train(train_subset, test_subset, val_subset, img_transforms)
 test(model)
 
 
