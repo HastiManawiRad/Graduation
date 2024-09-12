@@ -10,7 +10,6 @@ from pathlib import Path
 import torchvision.transforms as T
 import os
 
-# Define transformations
 
 # Grayscale transformation
 grayscale_transform = T.Grayscale(3)
@@ -92,8 +91,8 @@ def create_augmented_images_dataset(master_dataset_path, augmented_images_path):
                 augmented_image.save(save_path)
 
 # Paths to your datasets
-master_dataset = "D:\hasti\Object_detection\MD_images"  # Path to master dataset
-augmented_dataset = "D:\hasti\Object_detection\AUG_images"  # Path to save augmented images
+master_dataset = "PATH TO YOUR MASTER DATASET FOLDER"
+augmented_dataset = "PATH TO YOUR (EMPTY) AUGMENTED DATASET FOLDER"  # Path to save augmented images
 
 # Create augmented dataset
 create_augmented_images_dataset(master_dataset, augmented_dataset)
