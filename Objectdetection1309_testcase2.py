@@ -20,6 +20,7 @@ from torch.utils.tensorboard import SummaryWriter
 from torchvision.utils import draw_bounding_boxes
 from torchvision import transforms
 from torchvision.datasets import ImageFolder
+from matplotlib import patches
 import xml.etree.cElementTree as ET
 import time
 import glob
@@ -356,7 +357,7 @@ def test(model):
     model.to(device)
     model.eval()
     
-    test_image_path = r"C:\Users\HMd5\OneDrive - BVGO\School\Master\Afstuderen\OD\Outlets_test\rgb3_ex44_aug_0.png"
+    test_image_path = r"C:\Users\HMd5\OneDrive - BVGO\School\Master\Afstuderen\OD\Outlets_test\image00085.jpeg"
     test_image = Image.open(test_image_path)
 
     img_transforms = transforms.Compose([
@@ -397,9 +398,32 @@ def test(model):
     output_image = draw_bounding_boxes(test_image, pred_boxes, labels=formatted_labels, colors="red", width=3)
 
 
+    rect_width = 517
+    rect_height = 272
+
     plt.figure(figsize=(12, 12))
     plt.imshow(output_image.permute(1, 2, 0))
+
+    height, width = output_image.shape[1], output_image.shape[2]
+    plt.axhline(y=height/2, color='green', linestyle=':', linewidth=1.5)  # horizontal line in the middle
+    plt.axvline(x=width/2, color='green', linestyle=':', linewidth=1.5)   # vertical line in the middle
+
+    rect_x = (width / 2) - (rect_width / 2)
+    rect_y = (height / 2) - (rect_height / 2)
+    rect = patches.Rectangle((rect_x, rect_y), rect_width, rect_height, linewidth=1.5, edgecolor='green', facecolor='none', linestyle=':')
+    plt.gca().add_patch(rect)
+
+    rect_x_min = rect_x
+    rect_y_min = rect_y
+    rect_x_max = rect_x + rect_width
+    rect_y_max = rect_y + rect_height
+    print(f"Outlet coordinates: (x_min: {rect_x_min:.2f}, y_min: {rect_y_min:.2f}, x_max: {rect_x_max:.2f}, y_max: {rect_y_max:.2f})")
+
     plt.show()
+
+    #plt.figure(figsize=(12, 12))
+    #plt.imshow(output_image.permute(1, 2, 0))
+    #plt.show()
 
 #print fotos uit test subset
 
