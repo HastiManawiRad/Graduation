@@ -120,14 +120,14 @@ test_subset = 0
 
 class ExtractRGB(object):
     def __call__(self, img):
-        if img.shape[0] == 4:
-            return img[:3, :, :]
+        if isinstance(img, Image.Image) and img.mode =="RGBA":
+            img = img.convert("RGB")
         return img
 
 img_transforms = transforms.Compose([
     #transforms.Resize((224, 224)),
-    transforms.ToTensor(),
     ExtractRGB(),
+    transforms.ToTensor(),
     transforms.Normalize(mean=[0.5, 0.5, 0.5], std=[0.2, 0.2, 0.2])
 ])
 
@@ -357,11 +357,12 @@ def test(model):
     model.to(device)
     model.eval()
     
-    test_image_path = r"C:\Users\HMd5\OneDrive - BVGO\School\Master\Afstuderen\OD\Outlets_test\image00085.jpeg"
+    test_image_path = r"C:\Users\HMd5\OneDrive - BVGO\School\Master\Afstuderen\OD\Outlets_test\test_niek3.jpg"
     test_image = Image.open(test_image_path)
 
     img_transforms = transforms.Compose([
         #transforms.Resize((224, 224)),
+        ExtractRGB(),
         transforms.ToTensor(),
         transforms.Normalize(mean=[0.5, 0.5, 0.5], std=[0.2, 0.2, 0.2])
     ])
@@ -373,7 +374,7 @@ def test(model):
         predictions = model([test_image])
         pred = predictions[0]
 
-    confidence_treshold = 0.99
+    confidence_treshold = 0.95
     keep = pred["scores"] > confidence_treshold
 
     if keep.sum().item() == 0:
@@ -384,12 +385,43 @@ def test(model):
     pred_labels = pred["labels"][keep].cpu()
     pred_scores = pred["scores"][keep].cpu()
 
-    formatted_labels = [f"outlet {i+1}: {score:.3f}" for i, score in enumerate(pred_scores)]
+    formatted_labels = [f"Outlet {i+1}: {score:.3f}" for i, score in enumerate(pred_scores)]
 
     print("Bbox coordinates:")
     for i, (box, label) in enumerate(zip(pred_boxes, formatted_labels)):
         x_min, y_min, x_max, y_max = box
         print(f"{label} (x_min: {x_min:.2f}, y_min: {y_min:.2f}, x_max: {x_max:.2f}, y_max: {y_max:.2f})")
+
+    def get_intersection(box_expected, box_actual):
+        x_min1, y_min1, x_max1, y_max1 = box_expected
+        x_min2, y_min2, x_max2, y_max2 = box_actual
+
+        x_min_int = max(x_min1, x_min2)
+        y_min_int = max(y_min1, y_min2)
+        x_max_int = min(x_max1, x_max2)
+        y_max_int = min(y_max1, y_max2)
+
+        int_width = max(0, x_max_int - x_min_int)
+        int_height = max(0, y_max_int - y_min_int)
+
+        intersection_region = int_width * int_height
+        return intersection_region
+    
+    def comparison_boxes(pred_boxes, expected_box):
+        expected_region  = (expected_box[2] - expected_box[0]) * (expected_box[3] - expected_box[1])
+
+        for i, box in enumerate(pred_boxes):
+            intersection_region = get_intersection(box, expected_box)
+
+            pred_region = (box[2] - box[0]) *(box[3] - box[1])
+
+            if intersection_region == pred_region:
+                print(f"Outlet {i + 1} falls within expected region.")
+            elif intersection_region >0:
+                print(f"Outlet {i + 1} falls partially within expected region.")
+            else:
+                print(f"Outlet {i + 1} falls outside of expected region.")
+
 
     test_image = test_image.cpu()
     test_image = (255.0 * (test_image - test_image.min()) / (test_image.max() - test_image.min())).to(torch.uint8)
@@ -405,8 +437,8 @@ def test(model):
     plt.imshow(output_image.permute(1, 2, 0))
 
     height, width = output_image.shape[1], output_image.shape[2]
-    plt.axhline(y=height/2, color='green', linestyle=':', linewidth=1.5)  # horizontal line in the middle
-    plt.axvline(x=width/2, color='green', linestyle=':', linewidth=1.5)   # vertical line in the middle
+    plt.axhline(y=height/2, color='green', linestyle=':', linewidth=1.5)
+    plt.axvline(x=width/2, color='green', linestyle=':', linewidth=1.5)
 
     rect_x = (width / 2) - (rect_width / 2)
     rect_y = (height / 2) - (rect_height / 2)
@@ -417,9 +449,13 @@ def test(model):
     rect_y_min = rect_y
     rect_x_max = rect_x + rect_width
     rect_y_max = rect_y + rect_height
-    print(f"Outlet coordinates: (x_min: {rect_x_min:.2f}, y_min: {rect_y_min:.2f}, x_max: {rect_x_max:.2f}, y_max: {rect_y_max:.2f})")
-
+    print(f"Outlet expected coordinates: (x_min: {rect_x_min:.2f}, y_min: {rect_y_min:.2f}, x_max: {rect_x_max:.2f}, y_max: {rect_y_max:.2f})")
+    
     plt.show()
+
+    expected_box = [rect_x_min, rect_y_min, rect_x_max, rect_y_max]
+    comparison_boxes(pred_boxes, expected_box)
+    
 
     #plt.figure(figsize=(12, 12))
     #plt.imshow(output_image.permute(1, 2, 0))
