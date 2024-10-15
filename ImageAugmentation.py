@@ -1,8 +1,6 @@
-# This script aims to create augmented images from one image to create a larger dataset for our cnn model
+
 # The augmentation this script will perform on each object is 
 # orig_img,grayscaled_image,random_rotation_transformation_45_image,random_rotation_transformation_65_image,random_rotation_transformation_85_image,gausian_blurred_image_13_image,gausian_blurred_image_56_image,gausian_image_3,gausian_image_6,gausian_image_9,colour_jitter_image_1,colour_jitter_image_2,colour_jitter_image_3
-
-#call the function creating file with augmented image give path of dataset and path of folder where you want the augmented images to be stored
 
 import torch
 from PIL import Image
@@ -41,6 +39,7 @@ def augment_image(img_path):
     orig_img = Image.open(img_path).convert("RGB")
 
     # Apply transformations
+    # Turn any of these transformations off if you want less augmented images
     grayscaled_image = grayscale_transform(orig_img)
     random_rotation_transformation_45_image = random_rotation_transformation_45(orig_img)
     random_rotation_transformation_85_image = random_rotation_transformation_85(orig_img)
@@ -78,7 +77,7 @@ def create_augmented_images_dataset(master_dataset_path, augmented_images_path):
         augmented_images_folder.mkdir(parents=True, exist_ok=True)
 
     for element in master_dataset_folder.iterdir():
-        if element.is_file() and element.suffix.lower() == ".jpeg":
+        if element.is_file() and element.suffix.lower() == ".jpeg":    #change to your used data file type (jpg/png/etc)
             print(f"Processing image: {element}")
             subdir = augmented_images_folder / element.stem
             subdir.mkdir(parents=True, exist_ok=True)
