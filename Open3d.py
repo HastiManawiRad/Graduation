@@ -37,9 +37,6 @@ visualizer = o3d.visualization.Visualizer()
 visualizer.create_window("Pointcloud", width=1000, height=700)
 visualizer.add_geometry(pcd)
 
-#view_control = visualizer.get_view_control()
-#view_control.set_zoom(0.5)
-
 visualizer.run()
 visualizer.destroy_window()
 
