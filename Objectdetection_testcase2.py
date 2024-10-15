@@ -147,7 +147,7 @@ def custom_model(num_classes):
 def loadData():
 
     #create dataset & split
-    dataset = OutletsDataset(r"C:\Users\HMd5\OneDrive - BVGO\School\Master\Afstuderen\OD\Outlets_AUG", img_transforms)
+    dataset = OutletsDataset(r"PATH TO YOUR MASTER DATASET", img_transforms)
 
     train_ratio = 0.7
     val_ratio = 0.2
@@ -168,7 +168,7 @@ def loadData():
 
 def train(train_subset, test_subset, val_subset, img_transforms):
     BATCH_SIZE = 8
-    #train_dataset = ColumnsDataset()
+    #test_loader is not used in this code, you can remove it if you want and change the subset split to 70/30 for training/validation
     train_loader = DataLoader(train_subset, batch_size=BATCH_SIZE, pin_memory=False, shuffle=True, collate_fn=collate_fn)
     test_loader = DataLoader(test_subset, batch_size=BATCH_SIZE, pin_memory=False, shuffle=True, collate_fn=collate_fn)
     val_loader = DataLoader(val_subset, batch_size=BATCH_SIZE, pin_memory=False, shuffle=True, collate_fn=collate_fn)
@@ -501,8 +501,8 @@ def test(model, image_directory, csv_file_path):
 model = custom_model
 train_subset, test_subset, val_subset = loadData()
 #train(train_subset, test_subset, val_subset, img_transforms)
-image_directory = (r"C:\Users\HMd5\OneDrive - BVGO\School\Master\Afstuderen\OD\Sockets_testing")
-csv_file_path = (r"C:\Users\HMd5\OneDrive - BVGO\School\Master\Afstuderen\OD\Socket_coordinates.csv")
+image_directory = (r"PATH TO YOUR TESTING IMAGES")
+csv_file_path = (r"PATH TO YOUR CSV FILE")
 test(model, image_directory, csv_file_path)
 
 
