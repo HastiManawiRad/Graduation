@@ -8,6 +8,8 @@ import utils
 import matplotlib.pyplot as plt
 import math
 import pandas as pd
+import ifcopenshell
+import ifcopenshell.util.element
 
 import torchvision
 from torch import uint8
@@ -16,6 +18,7 @@ from torchvision.io import read_image
 from torchvision.transforms.functional import convert_image_dtype
 from torchvision.transforms import v2 as T2
 from torchvision.models.detection.faster_rcnn import FastRCNNPredictor
+from torchmetrics.detection.mean_ap import MeanAveragePrecision
 from torch.utils.data import Dataset, DataLoader, random_split, Subset
 from torch.utils.tensorboard import SummaryWriter
 from torchvision.utils import draw_bounding_boxes
@@ -25,6 +28,7 @@ from matplotlib import patches
 import xml.etree.cElementTree as ET
 import time
 import glob
+import json
 from PIL import Image, ImageFont, ImageOps
 #import engine
 #import tqdm
@@ -147,7 +151,7 @@ def custom_model(num_classes):
 def loadData():
 
     #create dataset & split
-    dataset = OutletsDataset(r"PATH TO YOUR MASTER DATASET", img_transforms)
+    dataset = OutletsDataset(r"C:\Users\HMd5\OneDrive - BVGO\School\Master\Afstuderen\OD\Outlets_AUG", img_transforms)
 
     train_ratio = 0.7
     val_ratio = 0.2
@@ -166,11 +170,16 @@ def loadData():
 
     return train_subset, test_subset, val_subset
 
+def AP(test_subset):
+    test_loader = DataLoader(test_subset, batch_size=8, pin_memory=False, shuffle=True, collate_fn=collate_fn)
+    return test_loader
+
+
 def train(train_subset, test_subset, val_subset, img_transforms):
     BATCH_SIZE = 8
-    #test_loader is not used in this code, you can remove it if you want and change the subset split to 70/30 for training/validation
+    #train_dataset = ColumnsDataset()
     train_loader = DataLoader(train_subset, batch_size=BATCH_SIZE, pin_memory=False, shuffle=True, collate_fn=collate_fn)
-    test_loader = DataLoader(test_subset, batch_size=BATCH_SIZE, pin_memory=False, shuffle=True, collate_fn=collate_fn)
+    #test_loader = DataLoader(test_subset, batch_size=BATCH_SIZE, pin_memory=False, shuffle=True, collate_fn=collate_fn)
     val_loader = DataLoader(val_subset, batch_size=BATCH_SIZE, pin_memory=False, shuffle=True, collate_fn=collate_fn)
     
     num_classes = 2
@@ -397,7 +406,7 @@ def test(model, image_directory, csv_file_path):
 
         if pred is None or (pred["scores"].sum() == 0):
             print(f"No detections for Socket {socket_id}")
-            placement_results[index] = "Image Not Found"
+            placement_results[index] = "No detections"
             continue  
 
         confidence_treshold = 0.85
@@ -459,7 +468,6 @@ def test(model, image_directory, csv_file_path):
         test_image = test_image[:3, ...]
         output_image = draw_bounding_boxes(test_image, pred_boxes, labels=formatted_labels, colors="red", width=3)
 
-
         rect_width = 517
         rect_height = 272
 
@@ -496,14 +504,135 @@ def test(model, image_directory, csv_file_path):
 
 
 
+def Average_Precision(model, test_loader, save_path="resultsAP.json"):
+    print("Start AP calculation process")
+    device = torch.device('cuda') if torch.cuda.is_available() else torch.device('cpu')
 
+    num_classes = 2
+    model = custom_model(num_classes)
+    checkpoint = torch.load("best-model-parameters.testcase2.pt")
+    model.load_state_dict(checkpoint["model_state_dict"])
+    model.to(device)
+    model.eval()
+
+    map_metric = MeanAveragePrecision(iou_thresholds=[0.5])
+
+    for images, targets in test_loader:
+            images = [image.to(device) for image in images]
+            targets = [{k: v.to(device) for k, v in t.items()} for t in targets]
+            
+            with torch.no_grad():
+                outputs = model(images)
+            
+            batch_predictions = []
+            batch_ground_truths = []
+
+            for i, output in enumerate(outputs):
+                batch_predictions.append({
+                    "boxes": output["boxes"].to("cpu"),
+                    "scores": output["scores"].to("cpu"),
+                    "labels": output["labels"].to("cpu")
+                })
+
+                batch_ground_truths.append({
+                    "boxes": targets[i]["boxes"].to("cpu"),
+                    "labels": targets[i]["labels"].to("cpu")
+                })
+
+            map_metric.update(batch_predictions, batch_ground_truths)
+        
+            result = map_metric.compute()
+            print(f"AP at IoU=0.5: {result['map_50'].item():.4f}")
+
+            with open(save_path, "w") as f:
+                result_serializable = {k: v.item() if isinstance(v, torch.Tensor) else v for k, v in result.items()}
+                json.dump(result_serializable, f, indent=4)
+            print(f"Results saved to {save_path}")
+
+
+def IFC_attribute(csv_file_path, ifc_file_path, asbuilt_ifc_path):
+    csv_data = pd.read_csv(csv_file_path, sep=";")
+    ifc_file = ifcopenshell.open(ifc_file_path)
+
+    for _, row in csv_data.iterrows():
+        guid = row['GUID']
+        placement_status = row['Placement']
+        socket_number = row["Socket"]
+
+        ifc_socket = ifc_file.by_guid(guid)
+
+        if ifc_socket:
+            print(f"Found Socket {socket_number} (GUID: {guid})")
+
+            if ifc_socket.is_a("IfcBuildingElementProxy"):
+                print(f"Processing socket with type: {ifc_socket.is_a()}")
+
+
+            existing_property_set = None
+            for rel in ifc_file.by_type("IfcRelDefinesByProperties"):
+                if rel.RelatedObjects and ifc_socket in rel.RelatedObjects:
+                    if rel.RelatingPropertyDefinition.Name == "As-Built Data":
+                        existing_property_set = rel.RelatingPropertyDefinition
+                        print(f"Found existing 'As-Built Data' property set: {existing_property_set.Name}")
+                        break
+
+            if not existing_property_set:
+                existing_property_set = ifc_file.create_entity(
+                    "IfcPropertySet",
+                    GlobalId=ifcopenshell.guid.new(),
+                    OwnerHistory=ifc_socket.OwnerHistory,
+                    Name="As-Built Data",
+                    Description="Properties related to as-built socket placement"
+                )
+                
+                rel_defines = ifc_file.create_entity(
+                    "IfcRelDefinesByProperties",
+                    GlobalId=ifcopenshell.guid.new(),
+                    OwnerHistory=ifc_socket.OwnerHistory,
+                    RelatedObjects=[ifc_socket],
+                    RelatingPropertyDefinition=existing_property_set
+                )
+                ifc_file.add(rel_defines)
+                print(f"Created new 'BIM Data' property and relationship")
+
+            property_value_asbuilt = ifc_file.create_entity(
+                "IfcPropertySingleValue",
+                Name="As-Built Placement",
+                Description="Placement As-Built object with respect to the As-Planned placement",
+                NominalValue=ifc_file.create_entity("IfcLabel", placement_status),
+                Unit=None
+            )
+
+            if existing_property_set.HasProperties:
+                existing_properties = existing_property_set.HasProperties
+                existing_property_set.HasProperties = existing_properties + (property_value_asbuilt,)
+            else:
+                existing_property_set.HasProperties = (property_value_asbuilt,)
+
+            print(f"Added 'As-Built Placement' with value '{placement_status}' to {existing_property_set.Name}.")
+
+    # Step 8: Save the modified IFC file
+    ifc_file.write(asbuilt_ifc_path)
+    print(f"As-Built IFC file saved at {asbuilt_ifc_path}")
+
+
+
+image_directory = (r"C:\Users\HMd5\OneDrive - BVGO\School\Master\Afstuderen\OD\Sockets_testing")
+csv_file_path = (r"C:\Users\HMd5\OneDrive - BVGO\School\Master\Afstuderen\OD\Socket_coordinates.csv")
+ifc_file_path = (r"C:\Users\HMd5\OneDrive - BVGO\School\Master\Afstuderen\OD\App_Eurostaete waypoints2.ifc")
+asbuilt_ifc_path = (r"C:\Users\HMd5\OneDrive - BVGO\School\Master\Afstuderen\OD\App_Eurostaete waypoints_asbuilt.ifc")
 
 model = custom_model
 train_subset, test_subset, val_subset = loadData()
+test_loader = AP(test_subset)
 #train(train_subset, test_subset, val_subset, img_transforms)
-image_directory = (r"PATH TO YOUR TESTING IMAGES")
-csv_file_path = (r"PATH TO YOUR CSV FILE")
 test(model, image_directory, csv_file_path)
+#Average_Precision(model, test_loader)
+#IFC_attribute(csv_file_path, ifc_file_path, asbuilt_ifc_path)
+
+
+
+
 
 
 
