@@ -151,7 +151,7 @@ def custom_model(num_classes):
 def loadData():
 
     #create dataset & split
-    dataset = OutletsDataset(r"C:\Users\HMd5\OneDrive - BVGO\School\Master\Afstuderen\OD\Outlets_AUG", img_transforms)
+    dataset = OutletsDataset(r"PATH TO YOUR DATASET", img_transforms)
 
     train_ratio = 0.7
     val_ratio = 0.2
@@ -331,7 +331,6 @@ def train(train_subset, test_subset, val_subset, img_transforms):
     plt.plot(range(1, epochs_completed + 1), epoch_losses, label="Training loss")
     plt.plot(range(1, epochs_completed + 1), validation_losses, label="Validation loss", linestyle='--')
 
-    # Update x-ticks based on the completed epochs
     plt.xticks(range(1, epochs_completed + 1))
 
     plt.xlabel("Epoch")
@@ -340,17 +339,6 @@ def train(train_subset, test_subset, val_subset, img_transforms):
     plt.legend()
     plt.savefig("Training_validation_loss_testcase2.pdf")
 
-    #save model with best parameters
-    #if avg_loss < best_loss:
-        #best_loss = avg_loss
-        #checkpoint = {
-            #"epoch": epoch,
-            #"model_state_dict": model.state_dict(),
-            #"optimizer_state_dict": optimizer.state_dict(),
-            #"avg_loss": avg_loss
-        #}
-        #torch.save(checkpoint, "best-model-parameters.testcase2.pt")
-    #torch.save(model.state_dict(), 'best-model-parameters.pt')
 
     
 
@@ -373,7 +361,6 @@ def test(model, image_directory, csv_file_path):
     csv_data.columns = csv_data.columns.str.strip()
 
     img_transforms = transforms.Compose([
-        #transforms.Resize((224, 224)),
         ExtractRGB(),
         transforms.ToTensor(),
         transforms.Normalize(mean=[0.5, 0.5, 0.5], std=[0.2, 0.2, 0.2])
@@ -611,24 +598,25 @@ def IFC_attribute(csv_file_path, ifc_file_path, asbuilt_ifc_path):
 
             print(f"Added 'As-Built Placement' with value '{placement_status}' to {existing_property_set.Name}.")
 
-    # Step 8: Save the modified IFC file
     ifc_file.write(asbuilt_ifc_path)
     print(f"As-Built IFC file saved at {asbuilt_ifc_path}")
 
 
 
-image_directory = (r"C:\Users\HMd5\OneDrive - BVGO\School\Master\Afstuderen\OD\Sockets_testing")
-csv_file_path = (r"C:\Users\HMd5\OneDrive - BVGO\School\Master\Afstuderen\OD\Socket_coordinates.csv")
-ifc_file_path = (r"C:\Users\HMd5\OneDrive - BVGO\School\Master\Afstuderen\OD\App_Eurostaete waypoints2.ifc")
-asbuilt_ifc_path = (r"C:\Users\HMd5\OneDrive - BVGO\School\Master\Afstuderen\OD\App_Eurostaete waypoints_asbuilt.ifc")
+image_directory = (r"PATH TO YOUR TESTING BATCH")
+csv_file_path = (r"PATH TO YOUR CSV FILE")
+ifc_file_path = (r"PATH TO YOUR IFC MODEL")
+asbuilt_ifc_path = (r"PATH TO YOUR AS-BUILT IFC MODEL")
 
+
+#HASH OUT WHATEVER MODULE YOU DO NOT WANT TO RUN HERE
 model = custom_model
 train_subset, test_subset, val_subset = loadData()
 test_loader = AP(test_subset)
-#train(train_subset, test_subset, val_subset, img_transforms)
+train(train_subset, test_subset, val_subset, img_transforms)
 test(model, image_directory, csv_file_path)
-#Average_Precision(model, test_loader)
-#IFC_attribute(csv_file_path, ifc_file_path, asbuilt_ifc_path)
+Average_Precision(model, test_loader)
+IFC_attribute(csv_file_path, ifc_file_path, asbuilt_ifc_path)
 
 
 
