@@ -1,7 +1,4 @@
 
-# The augmentation this script will perform on each object is 
-# orig_img,grayscaled_image,random_rotation_transformation_45_image,random_rotation_transformation_65_image,random_rotation_transformation_85_image,gausian_blurred_image_13_image,gausian_blurred_image_56_image,gausian_image_3,gausian_image_6,gausian_image_9,colour_jitter_image_1,colour_jitter_image_2,colour_jitter_image_3
-
 import torch
 from PIL import Image
 from pathlib import Path
